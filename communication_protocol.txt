@@ -1,0 +1,11 @@
+greetings:
+    client: {type, player_name}
+    server: {type, player_name, status}
+
+keepalive:
+    server: {type, player_name, server_time }    send
+    client: {type, status}  send
+
+exit:
+    client: {type, player_name} send
+    server: {type, status}  send

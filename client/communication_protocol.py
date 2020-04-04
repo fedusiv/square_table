@@ -1,0 +1,5 @@
+GREETING_TYPE = "greeting"
+KEEPALIVE_TYPE = "keepalive"
+STATUS_OK = "OK"
+STATUS_ERROR = "ERROR"
+EXIT_TYPE = "exit"

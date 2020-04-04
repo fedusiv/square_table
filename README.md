@@ -1,0 +1,2 @@
+README
+# SQUARE TABLE game
