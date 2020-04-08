@@ -3,23 +3,29 @@ import socket
 import time
 import threading
 import json
+import queue
 import communication_protocol as CP
 from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QPushButton, QLineEdit, QMessageBox,
                                 QHBoxLayout, QVBoxLayout)
 from PyQt5.QtCore import QObject, pyqtSignal
 
+#
+# Clinet Class - Communication with Server
+#
 class Client(QObject):
     port = 12345
-    message = None
-    _sock_run = False
-    player_name = None
-    #signals field
-    signal_clientconnected = pyqtSignal()
-    signal_keepalive = pyqtSignal('PyQt_PyObject')
+    _sock_run = False   # if True runs client socket connection
+    player_name = None  
+    thread_lock = None  # thread lock, for safe thread 
+    message_queue = None
+    # signals field
+    signal_clientconnected = pyqtSignal()   # when client connected to server emit signal
+    signal_keepalive = pyqtSignal('PyQt_PyObject')  # when received keepalive message
 
     def __init__(self):
         super().__init__()
-        
+        self.message_queue = queue.Queue()  # init infinite queue. hope it will not occur any problems
+
     def connect_to_server(self, server, name):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((server, self.port))
@@ -28,6 +34,7 @@ class Client(QObject):
             sys.exit(1)
         self.signal_clientconnected.emit()
         self._sock_run = True
+        self.thread_lock = threading.Lock()
         self.client_thread = threading.Thread(name="client", target=self.threaded)
         self.client_thread.start()
 
@@ -35,29 +42,35 @@ class Client(QObject):
         # send bye bye message to server
         self.sock.send(bytes(json.dumps({"type": CP.EXIT_TYPE, "player_name": self.player_name}), 'UTF-8'))
         # exit frim communication thread
-        self._sock_run = False
+        self.thread_safe_change_single_var( self._sock_run, False)
         if self.sock is not None:
             self.sock.close()
     
     def threaded(self):
-        server_keepalive_count = 20
-        server_keepalive_counter = 0
+        data = threading.local() # variables local for thread
+        data.server_keepalive_count = 20
+        data.server_keepalive_counter = 0
         # set timeout to one second. 
         self.sock.settimeout(1)
         while self._sock_run:
+            # delivery is message for send
+            delivery = self.get_message_from_queue_for_send()
+            if delivery is not None:
+                self.sock.send(bytes(delivery)) # send message to server
+
             try:
-                data = json.loads(self.sock.recv(1024).decode('UTF-8'))
+                received = json.loads(self.sock.recv(1024).decode('UTF-8'))
                 # message received keep alive to 0
-                server_keepalive_counter = 0
+                data.server_keepalive_counter = 0
                 # received keepalive
-                if data["type"] == CP.KEEPALIVE_TYPE:
-                    if data["player_name"] == self.player_name:
+                if received["type"] == CP.KEEPALIVE_TYPE:
+                    if received["player_name"] == self.player_name:
                         self.sock.send(bytes(json.dumps({"type": CP.KEEPALIVE_TYPE, "status": CP.STATUS_OK}),'UTF-8'))
-                        self.signal_keepalive.emit(data)
+                        self.signal_keepalive.emit(received)
             
             except socket.timeout:
-                server_keepalive_counter+=1
-                if server_keepalive_counter > server_keepalive_count :
+                data.server_keepalive_counter+=1
+                if data.server_keepalive_counter > data.server_keepalive_count :
                     print("No connection with server")
                     break
         # close the connection
@@ -78,6 +91,34 @@ class Client(QObject):
             #just wait for another try
             time.sleep(1)
 
+    # Player chose role to play
+    def send_choosen_role(self,role):
+        message = json.dumps( {"type": CP.CHOOSE_ROLE,"player_name" : self.player_name, "role": role})
+        self.put_message_to_queue_for_send(message)
+
+    # put message to queue for send to server
+    def put_message_to_queue_for_send(self, message):
+        self.thread_lock.acquire()
+        self.message_queue.put(message)
+        self.thread_lock.release()
+
+    # thread safe take first message for send to server
+    def get_message_from_queue_for_send(self):
+        var = None
+        self.thread_lock.acquire()
+        if not self.message_queue.empty() :
+            var = self.message_queue.get()
+        self.thread_lock.release()
+        return var
+
+    # method change variable in thread safe way
+    def thread_safe_change_single_var(self,var,value):
+        self.thread_lock.acquire()
+        var = value
+        self.thread_lock.release()
+#
+# Gui - Main Thread
+#
 class Gui(QWidget):
     def __init__(self):
         super().__init__()
@@ -139,7 +180,7 @@ class Gui(QWidget):
         self.layoutStatusBar.addWidget(self.qlabel_connectionStatus)
         self.layoutStatusBar.addWidget(self.qlabel_connectionNickName)
         self.layoutStatusBar.addWidget(self.qlabel_connectionServerTime)
-        
+
     def chooseRoleWindow(self):
         self.connectWindowClose()
         self.setFixedSize(700,350)
@@ -165,10 +206,13 @@ class Gui(QWidget):
 
         #Chose Role Buttons layout
         self.qbutton_chooseGeneral      = QPushButton(text="General")
+        self.qbutton_chooseGeneral.clicked.connect(self.on_clicked_choose_role)
         self.qbutton_chooseDiplomat     = QPushButton(text="Diplomat")
+        self.qbutton_chooseDiplomat.clicked.connect(self.on_clicked_choose_role)
         self.qbutton_chooseBishop       = QPushButton(text="Bishop")
         self.qbutton_chooseTreasurer    = QPushButton(text="Treasure")
         self.qbutton_chooseManufacturer = QPushButton(text="Manufacturer")
+        
 
         layoutButtons = QHBoxLayout()
         layoutButtons.addWidget(self.qbutton_chooseGeneral     )
@@ -219,6 +263,25 @@ class Gui(QWidget):
         self.qlabel_connectionNickName.setText("Name : " + message["player_name"])
         self.qlabel_connectionServerTime.setText(message["server_time"])
 
+    # Handler choosing role buttons. And jsut send information to server.
+    def on_clicked_choose_role(self, role):
+        button = self.sender()
+        role = None
+        if button == self.qbutton_chooseGeneral :
+            role = CP.GENERAL
+        elif button == self.qbutton_chooseDiplomat :
+            role = CP.DIPLOMAT
+        elif button == self.qbutton_chooseManufacturer:
+            role = CP.MANUFACTURER
+        elif button == self.qbutton_chooseBishop:
+            role = CP.BISHOP
+        elif button == self.qbutton_chooseTreasurer:
+            role = CP.TREASURER
+        elif button == self.qbutton_chooseRandomRole:
+            role = CP.ROLE_RANDOM
+        # say client to send player decision
+        self.client.send_choosen_role(role)
+        
 def main():
     app = QApplication(sys.argv)
     gui = Gui()
