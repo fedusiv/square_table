@@ -11,22 +11,34 @@ import parser
 
 class GameManager:
 
+    PLAYERS_AMOUNT = 5  # Size of players in game
+    game_run = False # if False, it means game waits for players to connect and choose roles; becomes True when all players will choose role
     players = [None] * 5
     def __init__(self):
         self.thread_lock = threading.Lock()
 
     def add_player(self, player):
+        if len(self.players) > self.PLAYERS_AMOUNT:
+            # request to add more players than required
+            return -1
         self.players.append(player)
+        p_id = len(self.players)
+        p_id -= 1
+        print(" add new player to GM with id: " + str(p_id) + " player name: " + player.name)
         players_list = ""
         for p in self.players:
             if p is not None:
                 players_list += p.name + " "
         print("players list : " + players_list)
+        return p_id
 
     def game_thread(self):
         while True:
             pass
 
+    # player send requst role for him in game
+    def request_role(self, p_id, role):
+        pass
 
 # thread function
 # sock - sock client connection
@@ -46,7 +58,11 @@ def threaded(sock, GM: GameManager):
             if g_message["type"] == CP.GREETING_TYPE:
                 player = Player(g_message["player_name"])
                 thread_lock.acquire()
-                GM.add_player(player)
+                player.id = GM.add_player(player)
+                if player.id == -1:
+                    # means that required num of players already added. Exit from connection
+                    print("All players are already connected")
+                    break
                 sock.send(bytes(json.dumps({"type": CP.GREETING_TYPE, "player_name": player.name, "status": CP.STATUS_OK}),
                              'UTF-8'))
                 init_message = True
@@ -74,7 +90,8 @@ def threaded(sock, GM: GameManager):
                 pass
             # choose role message
             if parsing.enum == parser.ParsingEnum.CHOOSE_ROLE:
-                player.role = parsing.role
+
+
                 continue
 
         except socket.timeout:
