@@ -13,7 +13,7 @@ class GameManager:
 
     PLAYERS_AMOUNT = 5  # Size of players in game
     game_run = False # if False, it means game waits for players to connect and choose roles; becomes True when all players will choose role
-    players = [None] * 5
+    players = []
     def __init__(self):
         self.thread_lock = threading.Lock()
 
