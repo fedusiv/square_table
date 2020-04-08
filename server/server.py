@@ -68,7 +68,7 @@ def threaded(sock, GM: GameManager):
     thread_lock = threading.Lock()
     init_message = False  # did receive init message?
     keep_alive_period = 1  # in seconds
-    keep_alive_count = 5  # count of missed keep_alive_communications
+    keep_alive_count = 10  # count of missed keep_alive_communications
     keep_alive_counter = 0
     while True:
         # greeting part. loop should wait until receive greeting message
@@ -85,14 +85,14 @@ def threaded(sock, GM: GameManager):
                 sock.send(bytes(json.dumps({"type": CP.GREETING_TYPE, "player_name": player.name, "status": CP.STATUS_OK}),
                              'UTF-8'))
                 init_message = True
-                previous_time_point = time.time()
                 print("Greeting player : " + player.name)
                 # set timeout for receiving messages equal to keepalive. It means, that communication betweem server
                 # and client should occurs each keepalive period
                 sock.settimeout(keep_alive_period)
             else:
                 continue
-        # receive message
+        
+        # receive messages
         try:
             message = json.loads(sock.recv(1024).decode('UTF-8'))
             keep_alive_counter = 0  # message receive keep_alive counter set to 0
@@ -107,9 +107,12 @@ def threaded(sock, GM: GameManager):
             if parsing.enum == parser.ParsingEnum.KEEP_ALIVE:
                 # just to be in touch with client
                 pass
-            # choose role message
-            if parsing.enum == parser.ParsingEnum.CHOOSE_ROLE:
+            # choose role request message
+            if parsing.enum == parser.ParsingEnum.CHOOSE_ROLE_REQUEST:
                 GM.request_role(player.id, parsing.role)
+                sock.send(bytes(json.dumps({"type": CP.CHOOSE_ROLE_REQUEST, 
+                                            "player_name": player.name, 
+                                            "role": player.request_role}),'UTF-8'))
                 continue
 
         except socket.timeout:
@@ -136,7 +139,7 @@ def parse_received_message(info):
     type_switch = {
         CP.KEEPALIVE_TYPE: parser.parse_keepalive,
         CP.EXIT_TYPE: parser.parse_exit,
-        CP.CHOOSE_ROLE: parser.parse_choose_role
+        CP.CHOOSE_ROLE_REQUEST: parser.parse_choose_role
     }
 
     parse = type_switch.get(info.message["type"], parser.parse_error_parse)

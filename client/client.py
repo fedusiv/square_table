@@ -21,6 +21,7 @@ class Client(QObject):
     # signals field
     signal_clientconnected = pyqtSignal()   # when client connected to server emit signal
     signal_keepalive = pyqtSignal('PyQt_PyObject')  # when received keepalive message
+    signal_choose_role_requst_approve= pyqtSignal('PyQt_PyObject') # when received choose role approve. It means client is ready for game. And waiting for another players
 
     def __init__(self):
         super().__init__()
@@ -67,7 +68,11 @@ class Client(QObject):
                     if received["player_name"] == self.player_name:
                         self.sock.send(bytes(json.dumps({"type": CP.KEEPALIVE_TYPE, "status": CP.STATUS_OK}),'UTF-8'))
                         self.signal_keepalive.emit(received)
-            
+                # server sent approvment, that it received request for choosen role
+                if received["type"] == CP.CHOOSE_ROLE_REQUEST:
+                    if received["player_name"] == self.player_name:
+                        self.signal_choose_role_requst_approve.emit(received["role"])
+
             except socket.timeout:
                 data.server_keepalive_counter+=1
                 if data.server_keepalive_counter > data.server_keepalive_count :
@@ -93,7 +98,7 @@ class Client(QObject):
 
     # Player chose role to play
     def send_choosen_role(self,role):
-        message = {"type": CP.CHOOSE_ROLE,"player_name" : self.player_name, "role": role}
+        message = {"type": CP.CHOOSE_ROLE_REQUEST,"player_name" : self.player_name, "role": role}
         self.put_message_to_queue_for_send(message)
 
     # put message to queue for send to server
@@ -130,6 +135,7 @@ class Gui(QWidget):
     def signals_init(self):
         self.client.signal_clientconnected.connect(self.on_client_connected_to_server)
         self.client.signal_keepalive.connect(self.on_client_keepalive)
+        self.client.signal_choose_role_requst_approve.connect(self.on_choose_role_request_approved) # server approve role request
 
     def initUI(self):
         self.setFixedSize(150,200)
@@ -176,10 +182,12 @@ class Gui(QWidget):
         self.qlabel_connectionStatus = QLabel()
         self.qlabel_connectionNickName = QLabel()
         self.qlabel_connectionServerTime = QLabel()
+        self.qlabel_connectionReadyForGame = QLabel()
         self.layoutStatusBar = QHBoxLayout()
         self.layoutStatusBar.addWidget(self.qlabel_connectionStatus)
         self.layoutStatusBar.addWidget(self.qlabel_connectionNickName)
         self.layoutStatusBar.addWidget(self.qlabel_connectionServerTime)
+        self.layoutStatusBar.addWidget(self.qlabel_connectionReadyForGame)
 
     def chooseRoleWindow(self):
         self.connectWindowClose()
@@ -214,8 +222,9 @@ class Gui(QWidget):
         self.qbutton_chooseTreasurer    = QPushButton(text="Treasure")
         self.qbutton_chooseTreasurer.clicked.connect(self.on_clicked_choose_role)
         self.qbutton_chooseManufacturer = QPushButton(text="Manufacturer")
-        self.qbutton_chooseManufacturer.clicked.connect(self.on_clicked_choose_role)
+        self.qbutton_chooseTreasurer.clicked.connect(self.on_clicked_choose_role)
         
+
         layoutButtons = QHBoxLayout()
         layoutButtons.addWidget(self.qbutton_chooseGeneral     )
         layoutButtons.addWidget(self.qbutton_chooseDiplomat    )
@@ -283,7 +292,18 @@ class Gui(QWidget):
             role = CP.ROLE_RANDOM
         # say client to send player decision
         self.client.send_choosen_role(role)
-        
+    
+    def on_choose_role_request_approved(self, role):
+        # disable buttons for choose role
+        self.qbutton_chooseGeneral.setEnabled(False)
+        self.qbutton_chooseDiplomat.setEnabled(False)
+        self.qbutton_chooseBishop.setEnabled(False)
+        self.qbutton_chooseManufacturer.setEnabled(False)
+        self.qbutton_chooseTreasurer.setEnabled(False)
+        self.qbutton_chooseRandomRole.setEnabled(False)
+        # write that server ready for game. waiting for players
+        self.qlabel_connectionReadyForGame.setText("Waiting for other players")
+
 def main():
     app = QApplication(sys.argv)
     gui = Gui()

@@ -10,7 +10,7 @@ exit:
     client: {type, player_name} send
     server: {type, status}  send
 
-choose_role:
+choose_role_request:
     client: {type, player_name, role} send
     server: {type, player_name, role} send
-    Client sends role which he wants to choose. Server sends role, which player should play
+    Client sends role which he wants to choose. Server sends approvment that received request
