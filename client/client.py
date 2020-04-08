@@ -305,7 +305,7 @@ class Gui(QWidget):
         self.qbutton_chooseTreasurer.setEnabled(False)
         self.qbutton_chooseRandomRole.setEnabled(False)
         # write that server ready for game. waiting for players
-        self.qlabel_connectionReadyForGame.setText("Waiting for other players")
+        self.qlabel_connectionReadyForGame.setText("Waiting for other players. Requset: " + role)
 
 def main():
     app = QApplication(sys.argv)
