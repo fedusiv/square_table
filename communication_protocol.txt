@@ -14,3 +14,8 @@ choose_role_request:
     client: {type, player_name, role} send
     server: {type, player_name, role} send
     Client sends role which he wants to choose. Server sends approvment that received request
+
+start_game:
+    server: {type, player_name, role} send
+    client: {type, status}
+    server sends to each player role, which was decided, and client starts game

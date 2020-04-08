@@ -1,17 +1,16 @@
-import tkinter as tk
-from tkinter import ttk
 import socket
 from _thread import *
 import threading
 import time
 import json
+import algorithms
 import communication_protocol as CP
 from player import Player
 import parser
 
 class GameManager:
 
-    PLAYERS_AMOUNT = 5  # Size of players in game
+    PLAYERS_AMOUNT = 2  # Size of players in game
     game_run = False # if False, it means game waits for players to connect and choose roles; becomes True when all players will choose role
     players = []
     def __init__(self):
@@ -20,6 +19,7 @@ class GameManager:
     def add_player(self, player):
         if len(self.players) > self.PLAYERS_AMOUNT:
             # request to add more players than required
+            print("Can not accept more players")
             return -1
         self.players.append(player)
         p_id = len(self.players)
@@ -34,7 +34,23 @@ class GameManager:
 
     def game_thread(self):
         while True:
-            pass
+            # Main loop for game
+            # If game is not running. Game is waiting for players
+            if self.game_run :
+                pass
+            else:
+                # Check request
+                player_ready_count = 0
+                for player in self.players:
+                    if player.request_role is not None:
+                        player_ready_count += 1
+                        continue
+                    else:
+                        # Someone is not ready for game. 
+                        break
+                if player_ready_count == self.PLAYERS_AMOUNT:
+                    # START GAME
+                    self.start_game()    
 
     # player send requst role for him in game
     def request_role(self, p_id, role):
@@ -42,7 +58,8 @@ class GameManager:
         self.players[p_id].request_role = role
         print("player: " + self.players[p_id].name + " requested role: " + self.players[p_id].request_role)
         self.thread_lock.release()
-    
+
+    # If player is disconnected, so remove player
     def delete_player(self, p_id):
         self.thread_lock.acquire()
         print("player: " + self.players[p_id].name + " is deleting")
@@ -56,10 +73,23 @@ class GameManager:
         for p in self.players:
             if p is not None:
                 players_list += p.name + " "
-                role_list += p.request_role + " "
         print("players list : " + players_list)
-        print("request role list : " + role_list)
         self.thread_lock.release()
+
+    # Funtion to START GAME
+    def start_game(self):
+        # choose roles for players
+        roles = algorithms.choose_roles()
+        for i in range(self.PLAYERS_AMOUNT):
+            self.players[i].role = roles[i]
+        # prepare messages for players
+        self.thread_lock.acquire()
+        for player in self.players:
+            player.send_start_game()
+        self.thread_lock.release()
+        self.game_run = True
+
+
 
 # thread function
 # sock - sock client connection
@@ -70,6 +100,7 @@ def threaded(sock, GM: GameManager):
     keep_alive_period = 1  # in seconds
     keep_alive_count = 10  # count of missed keep_alive_communications
     keep_alive_counter = 0
+    player = None
     while True:
         # greeting part. loop should wait until receive greeting message
         if init_message is False:
@@ -91,7 +122,11 @@ def threaded(sock, GM: GameManager):
                 sock.settimeout(keep_alive_period)
             else:
                 continue
-        
+        # send messages
+        if not player.message_queue.empty():
+            # if queue messages is not empty
+            delivery = player.message_queue.get()
+            sock.send(bytes(json.dumps(delivery), 'UTF-8')) # send message to client
         # receive messages
         try:
             message = json.loads(sock.recv(1024).decode('UTF-8'))

@@ -72,6 +72,9 @@ class Client(QObject):
                 if received["type"] == CP.CHOOSE_ROLE_REQUEST:
                     if received["player_name"] == self.player_name:
                         self.signal_choose_role_requst_approve.emit(received["role"])
+                if received["type"] == CP.START_GAME:
+                    if received["player_name"] == self.player_name:
+                        print(" Received role : " + received["role"])
 
             except socket.timeout:
                 data.server_keepalive_counter+=1
@@ -222,7 +225,7 @@ class Gui(QWidget):
         self.qbutton_chooseTreasurer    = QPushButton(text="Treasure")
         self.qbutton_chooseTreasurer.clicked.connect(self.on_clicked_choose_role)
         self.qbutton_chooseManufacturer = QPushButton(text="Manufacturer")
-        self.qbutton_chooseTreasurer.clicked.connect(self.on_clicked_choose_role)
+        self.qbutton_chooseManufacturer.clicked.connect(self.on_clicked_choose_role)
         
 
         layoutButtons = QHBoxLayout()
