@@ -38,7 +38,28 @@ class GameManager:
 
     # player send requst role for him in game
     def request_role(self, p_id, role):
-        pass
+        self.thread_lock.acquire()
+        self.players[p_id].request_role = role
+        print("player: " + self.players[p_id].name + " requested role: " + self.players[p_id].request_role)
+        self.thread_lock.release()
+    
+    def delete_player(self, p_id):
+        self.thread_lock.acquire()
+        print("player: " + self.players[p_id].name + " is deleting")
+        del self.players[p_id]
+        # reassign id for players 
+        for i in range(len(self.players)):
+            self.players[i].id = i
+        # print players and role request
+        players_list=""
+        role_list=""
+        for p in self.players:
+            if p is not None:
+                players_list += p.name + " "
+                role_list += p.request_role + " "
+        print("players list : " + players_list)
+        print("request role list : " + role_list)
+        self.thread_lock.release()
 
 # thread function
 # sock - sock client connection
@@ -46,8 +67,6 @@ class GameManager:
 def threaded(sock, GM: GameManager):
     thread_lock = threading.Lock()
     init_message = False  # did receive init message?
-    previous_time_point = None
-    current_time_point = None
     keep_alive_period = 1  # in seconds
     keep_alive_count = 5  # count of missed keep_alive_communications
     keep_alive_counter = 0
@@ -90,8 +109,7 @@ def threaded(sock, GM: GameManager):
                 pass
             # choose role message
             if parsing.enum == parser.ParsingEnum.CHOOSE_ROLE:
-
-
+                GM.request_role(player.id, parsing.role)
                 continue
 
         except socket.timeout:
@@ -109,6 +127,7 @@ def threaded(sock, GM: GameManager):
     # connection closed
     if player is not None:
         print("Disconnected player :  " + player.name)
+        GM.delete_player(player.id)
     else:
         print("Disconnected unknown client")
     sock.close()

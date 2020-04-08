@@ -56,7 +56,7 @@ class Client(QObject):
             # delivery is message for send
             delivery = self.get_message_from_queue_for_send()
             if delivery is not None:
-                self.sock.send(bytes(delivery)) # send message to server
+                self.sock.send(bytes(json.dumps(delivery), 'UTF-8')) # send message to server
 
             try:
                 received = json.loads(self.sock.recv(1024).decode('UTF-8'))
@@ -93,7 +93,7 @@ class Client(QObject):
 
     # Player chose role to play
     def send_choosen_role(self,role):
-        message = json.dumps( {"type": CP.CHOOSE_ROLE,"player_name" : self.player_name, "role": role})
+        message = {"type": CP.CHOOSE_ROLE,"player_name" : self.player_name, "role": role}
         self.put_message_to_queue_for_send(message)
 
     # put message to queue for send to server
@@ -210,10 +210,12 @@ class Gui(QWidget):
         self.qbutton_chooseDiplomat     = QPushButton(text="Diplomat")
         self.qbutton_chooseDiplomat.clicked.connect(self.on_clicked_choose_role)
         self.qbutton_chooseBishop       = QPushButton(text="Bishop")
+        self.qbutton_chooseBishop.clicked.connect(self.on_clicked_choose_role)
         self.qbutton_chooseTreasurer    = QPushButton(text="Treasure")
+        self.qbutton_chooseTreasurer.clicked.connect(self.on_clicked_choose_role)
         self.qbutton_chooseManufacturer = QPushButton(text="Manufacturer")
+        self.qbutton_chooseManufacturer.clicked.connect(self.on_clicked_choose_role)
         
-
         layoutButtons = QHBoxLayout()
         layoutButtons.addWidget(self.qbutton_chooseGeneral     )
         layoutButtons.addWidget(self.qbutton_chooseDiplomat    )
