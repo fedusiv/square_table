@@ -1,4 +1,5 @@
 import socket
+import sys
 from _thread import *
 import threading
 import time
@@ -10,14 +11,14 @@ import parser
 
 class GameManager:
 
-    PLAYERS_AMOUNT = 2  # Size of players in game
+    PLAYERS_AMOUNT = 1  # Size of players in game
     game_run = False # if False, it means game waits for players to connect and choose roles; becomes True when all players will choose role
     players = []
     def __init__(self):
         self.thread_lock = threading.Lock()
 
     def add_player(self, player):
-        if len(self.players) > self.PLAYERS_AMOUNT:
+        if len(self.players) + 1 > self.PLAYERS_AMOUNT:
             # request to add more players than required
             print("Can not accept more players")
             return -1
@@ -110,9 +111,11 @@ def threaded(sock, GM: GameManager):
                 thread_lock.acquire()
                 player.id = GM.add_player(player)
                 if player.id == -1:
-                    # means that required num of players already added. Exit from connection
-                    print("All players are already connected")
-                    break
+                    # means that required num of players already added. Exit from connection. Exit from thread
+                    print("All players are already connected. Disconnect name: " + player.name)
+                    del player
+                    sock.close()
+                    return 0
                 sock.send(bytes(json.dumps({"type": CP.GREETING_TYPE, "player_name": player.name, "status": CP.STATUS_OK}),
                              'UTF-8'))
                 init_message = True
@@ -180,10 +183,9 @@ def parse_received_message(info):
     parse = type_switch.get(info.message["type"], parser.parse_error_parse)
     return parse(info)
 
-def Main():
+def Main(s):
     host = ""
     port = 12345
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((host, port))
     print("socket binded to port", port)
     s.listen(5)
@@ -199,8 +201,20 @@ def Main():
         x = threading.Thread(name="client" + str(client_count), target=threaded, args=(c, game))
         x.start()
         client_count += 1
+        _thread_list.append(x)
     s.close()
 
+_thread_list = []
 
 if __name__ == '__main__':
-    Main()
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        Main(s)
+    except KeyboardInterrupt:
+        print("Catch Keyboard Interrupt")
+        s.close ()
+        sys.exit(0)
+    except Exception:
+        print("Exeption exit")
+    s.close()
+    sys.exit(0)
