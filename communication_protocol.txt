@@ -2,6 +2,10 @@ greetings:
     client: {type, player_name}
     server: {type, player_name, status}
 
+name_unacceptable:
+    server: {type, player_name} send
+    server sends, that this name is alredy used
+
 keepalive:
     server: {type, player_name, server_time }    send
     client: {type, status}  send

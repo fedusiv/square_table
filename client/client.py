@@ -20,9 +20,10 @@ class Client(QObject):
     message_queue = None
     # signals field
     signal_clientconnected = pyqtSignal()   # when client connected to server emit signal
+    signal_nameunacceptable = pyqtSignal('PyQt_PyObject') # server send that name is unacceptable
     signal_keepalive = pyqtSignal('PyQt_PyObject')  # when received keepalive message
     signal_choose_role_requst_approve= pyqtSignal('PyQt_PyObject') # when received choose role approve. It means client is ready for game. And waiting for another players
-
+    
     def __init__(self):
         super().__init__()
         self.message_queue = queue.Queue()  # init infinite queue. hope it will not occur any problems
@@ -32,7 +33,9 @@ class Client(QObject):
         self.sock.connect((server, self.port))
         self.player_name = name
         if self.greeting_server() is False:
-            sys.exit(1)
+            self.sock.close()
+            self.sock = None
+            return 0
         self.signal_clientconnected.emit()
         self._sock_run = True
         self.thread_lock = threading.Lock()
@@ -90,6 +93,11 @@ class Client(QObject):
         while True:
             self.sock.send(bytes(json.dumps(message), 'UTF-8'))
             answer = json.loads(self.sock.recv(1024).decode('UTF-8'))
+            if answer["type"] == CP.NAME_UNACCEPTABLE:
+                if answer["player_name"] == self.player_name: 
+                # name is unacceptable for server
+                    self.signal_nameunacceptable.emit(answer["player_name"])
+                    return False
             if answer["type"] == CP.GREETING_TYPE:
                 if answer["status"] == CP.STATUS_OK:
                     if answer["player_name"] == self.player_name:
@@ -137,6 +145,7 @@ class Gui(QWidget):
     # All signals should be initilized here
     def signals_init(self):
         self.client.signal_clientconnected.connect(self.on_client_connected_to_server)
+        self.client.signal_nameunacceptable.connect(self.on_name_unacceptable)  # server sent that name is unacceptable for server
         self.client.signal_keepalive.connect(self.on_client_keepalive)
         self.client.signal_choose_role_requst_approve.connect(self.on_choose_role_request_approved) # server approve role request
 
@@ -171,6 +180,14 @@ class Gui(QWidget):
         self.qbutton_connect.move(30,130)
         self.qbutton_connect.show()
         self.qbutton_connect.clicked.connect(self.on_connect_to_server_clicked)
+
+        self.qlabel_connect_servermessage = QLabel(parent=self)
+        self.qlabel_connect_servermessage.move(10, 180)
+        self.qlabel_connect_servermessage.show()
+
+    def on_name_unacceptable(self,player_name):
+        self.qlabel_connect_servermessage.setFixedSize(130,20)
+        self.qlabel_connect_servermessage.setText("Change name: " + player_name)
 
     # hide start-connect window
     def connectWindowClose(self):

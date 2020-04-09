@@ -11,7 +11,7 @@ import parser
 
 class GameManager:
 
-    PLAYERS_AMOUNT = 1  # Size of players in game
+    PLAYERS_AMOUNT = 2  # Size of players in game
     game_run = False # if False, it means game waits for players to connect and choose roles; becomes True when all players will choose role
     players = []
     def __init__(self):
@@ -22,6 +22,11 @@ class GameManager:
             # request to add more players than required
             print("Can not accept more players")
             return -1
+        # check if name is already used
+        for p in self.players:
+            if p.name == player.name:
+                # name is already used. Unacceptable
+                return -2
         self.players.append(player)
         p_id = len(self.players)
         p_id -= 1
@@ -70,7 +75,6 @@ class GameManager:
             self.players[i].id = i
         # print players and role request
         players_list=""
-        role_list=""
         for p in self.players:
             if p is not None:
                 players_list += p.name + " "
@@ -102,76 +106,93 @@ def threaded(sock, GM: GameManager):
     keep_alive_count = 10  # count of missed keep_alive_communications
     keep_alive_counter = 0
     player = None
-    while True:
-        # greeting part. loop should wait until receive greeting message
-        if init_message is False:
-            g_message = json.loads(sock.recv(1024).decode('UTF-8'))
-            if g_message["type"] == CP.GREETING_TYPE:
-                player = Player(g_message["player_name"])
-                thread_lock.acquire()
-                player.id = GM.add_player(player)
-                if player.id == -1:
-                    # means that required num of players already added. Exit from connection. Exit from thread
-                    print("All players are already connected. Disconnect name: " + player.name)
-                    del player
-                    sock.close()
-                    return 0
-                sock.send(bytes(json.dumps({"type": CP.GREETING_TYPE, "player_name": player.name, "status": CP.STATUS_OK}),
+    player_accepted = False  # If player was added to Game Manager 
+    try:
+        while True:
+            # greeting part. loop should wait until receive greeting message
+            if init_message is False:
+                g_message = json.loads(sock.recv(1024).decode('UTF-8'))
+                if g_message["type"] == CP.GREETING_TYPE:
+                    player = Player(g_message["player_name"])
+                    thread_lock.acquire()
+                    player.id = GM.add_player(player)
+                    if player.id == -1:
+                        # means that required num of players already added. Exit from connection. Exit from thread
+                        print("All players are already connected. Disconnect name: " + player.name)
+                        break
+                    if player.id == -2:
+                        # player name is unacceptable. player name is already used
+                        print("Can not accept player name: " + player.name + "  Player Name should be uniq")
+                        sock.send(bytes(json.dumps({"type": CP.NAME_UNACCEPTABLE, "player_name": player.name}),'UTF-8'))
+                        break
+                    player_accepted = True
+                    sock.send(bytes(json.dumps({"type": CP.GREETING_TYPE, "player_name": player.name, "status": CP.STATUS_OK}),
+                                 'UTF-8'))
+                    init_message = True
+                    print("Greeting player : " + player.name)
+                    # set timeout for receiving messages equal to keepalive. It means, that communication betweem server
+                    # and client should occurs each keepalive period
+                    sock.settimeout(keep_alive_period)
+                else:
+                    continue
+            # send messages
+            if not player.message_queue.empty():
+                # if queue messages is not empty
+                delivery = player.message_queue.get()
+                sock.send(bytes(json.dumps(delivery), 'UTF-8')) # send message to client
+            # receive messages
+            try:
+                message = json.loads(sock.recv(1024).decode('UTF-8'))
+                keep_alive_counter = 0  # message receive keep_alive counter set to 0
+                info = parser.parserInput(message, player.name)
+                parsing = parse_received_message(info)
+
+                # exit message
+                if parsing.enum == parser.ParsingEnum.EXIT:
+                    print(" Received exit from player : " + player.name)
+                    break
+                # keep_alive message
+                if parsing.enum == parser.ParsingEnum.KEEP_ALIVE:
+                    # just to be in touch with client
+                    pass
+                # choose role request message
+                if parsing.enum == parser.ParsingEnum.CHOOSE_ROLE_REQUEST:
+                    GM.request_role(player.id, parsing.role)
+                    sock.send(bytes(json.dumps({"type": CP.CHOOSE_ROLE_REQUEST, 
+                                                "player_name": player.name, 
+                                                "role": player.request_role}),'UTF-8'))
+                    continue
+
+            except socket.timeout:
+                # if does not recieve need to send keepalive message to check is client alive.
+                keep_alive_counter += 1
+                if keep_alive_counter > keep_alive_count:
+                    # client does not respones
+                    print("Client of player : " + player.name + " disconnected via keep alive")
+                    break
+                servertime = time.asctime(time.localtime(time.time()))
+                sock.send(bytes(json.dumps({"type": CP.KEEPALIVE_TYPE, "player_name": player.name, "server_time": servertime}),
                              'UTF-8'))
-                init_message = True
-                print("Greeting player : " + player.name)
-                # set timeout for receiving messages equal to keepalive. It means, that communication betweem server
-                # and client should occurs each keepalive period
-                sock.settimeout(keep_alive_period)
-            else:
-                continue
-        # send messages
-        if not player.message_queue.empty():
-            # if queue messages is not empty
-            delivery = player.message_queue.get()
-            sock.send(bytes(json.dumps(delivery), 'UTF-8')) # send message to client
-        # receive messages
-        try:
-            message = json.loads(sock.recv(1024).decode('UTF-8'))
-            keep_alive_counter = 0  # message receive keep_alive counter set to 0
-            info = parser.parserInput(message, player.name)
-            parsing = parse_received_message(info)
 
-            # exit message
-            if parsing.enum == parser.ParsingEnum.EXIT:
-                print(" Received exit from player : " + player.name)
-                break
-            # keep_alive message
-            if parsing.enum == parser.ParsingEnum.KEEP_ALIVE:
-                # just to be in touch with client
-                pass
-            # choose role request message
-            if parsing.enum == parser.ParsingEnum.CHOOSE_ROLE_REQUEST:
-                GM.request_role(player.id, parsing.role)
-                sock.send(bytes(json.dumps({"type": CP.CHOOSE_ROLE_REQUEST, 
-                                            "player_name": player.name, 
-                                            "role": player.request_role}),'UTF-8'))
-                continue
-
-        except socket.timeout:
-            # if does not recieve need to send keepalive message to check is client alive.
-            keep_alive_counter += 1
-            if keep_alive_counter > keep_alive_count:
-                # client does not respones
-                print("Client of player : " + player.name + " disconnected via keep alive")
-                break
-            servertime = time.asctime(time.localtime(time.time()))
-            sock.send(bytes(json.dumps({"type": CP.KEEPALIVE_TYPE, "player_name": player.name, "server_time": servertime}),
-                         'UTF-8'))
-
-        # end of loop
-    # connection closed
-    if player is not None:
-        print("Disconnected player :  " + player.name)
-        GM.delete_player(player.id)
-    else:
-        print("Disconnected unknown client")
-    sock.close()
+            # end of loop
+        # connection closed
+        if player is not None:
+            if player_accepted:
+                print("Disconnected player :  " + player.name)
+                GM.delete_player(player.id)
+            del player    
+        else:
+            print("Disconnected unknown client")
+        sock.close()
+    
+    # if was any unexpected exeption
+    except Exception:
+        print("Closing connection and del player if was exeption")
+        if player is not None:
+            if player_accepted:
+                GM.delete_player(player.id)
+            del player    
+        sock.close()
 
 def parse_received_message(info):
     type_switch = {
