@@ -5,7 +5,8 @@ from enum import Enum
 class ParsingEnum(Enum):
     EXIT = 1,
     KEEP_ALIVE = 2,
-    CHOOSE_ROLE_REQUEST = 3
+    CHOOSE_ROLE_REQUEST = 3,
+    START_GAME = 4
 
 
 class Parsing:
@@ -44,3 +45,6 @@ def parse_choose_role(input):
         res = Parsing(ParsingEnum.CHOOSE_ROLE_REQUEST)
         res.role = input.message["role"]
         return res
+
+def parse_start_game(input):
+    return Parsing(ParsingEnum.START_GAME)

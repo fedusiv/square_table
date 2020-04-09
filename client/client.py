@@ -23,7 +23,8 @@ class Client(QObject):
     signal_nameunacceptable = pyqtSignal('PyQt_PyObject') # server send that name is unacceptable
     signal_keepalive = pyqtSignal('PyQt_PyObject')  # when received keepalive message
     signal_choose_role_requst_approve= pyqtSignal('PyQt_PyObject') # when received choose role approve. It means client is ready for game. And waiting for another players
-    
+    signal_start_game = pyqtSignal('PyQt_PyObject') # server send player's role, and that game is about to start
+
     def __init__(self):
         super().__init__()
         self.message_queue = queue.Queue()  # init infinite queue. hope it will not occur any problems
@@ -63,7 +64,17 @@ class Client(QObject):
                 self.sock.send(bytes(json.dumps(delivery), 'UTF-8')) # send message to server
 
             try:
-                received = json.loads(self.sock.recv(1024).decode('UTF-8'))
+                reciving = self.sock.recv(1024).decode('UTF-8')
+                if reciving == "":
+                    #empty message
+                    continue
+                received = {} # to avoid parsing none object
+                # try to convert income string to json
+                try:
+                    received = json.loads(reciving)
+                except json.JSONDecodeError:
+                    # if can not convert just go to another loop step
+                    continue
                 # message received keep alive to 0
                 data.server_keepalive_counter = 0
                 # received keepalive
@@ -75,10 +86,12 @@ class Client(QObject):
                 if received["type"] == CP.CHOOSE_ROLE_REQUEST:
                     if received["player_name"] == self.player_name:
                         self.signal_choose_role_requst_approve.emit(received["role"])
+                # server sent role for player and that game is starting
                 if received["type"] == CP.START_GAME:
                     if received["player_name"] == self.player_name:
-                        print(" Received role : " + received["role"])
-
+                        # received player role, so START GAME. Just to ping server, that player is ready
+                        self.sock.send(bytes(json.dumps({"type": CP.START_GAME, "status": CP.STATUS_OK}),'UTF-8'))
+                        self.signal_start_game.emit(received["role"])
             except socket.timeout:
                 data.server_keepalive_counter+=1
                 if data.server_keepalive_counter > data.server_keepalive_count :
@@ -148,6 +161,7 @@ class Gui(QWidget):
         self.client.signal_nameunacceptable.connect(self.on_name_unacceptable)  # server sent that name is unacceptable for server
         self.client.signal_keepalive.connect(self.on_client_keepalive)
         self.client.signal_choose_role_requst_approve.connect(self.on_choose_role_request_approved) # server approve role request
+        self.client.signal_start_game.connect(self.on_game_start)   # server send role, and game is starting
 
     def initUI(self):
         self.setFixedSize(150,200)
@@ -323,6 +337,14 @@ class Gui(QWidget):
         self.qbutton_chooseRandomRole.setEnabled(False)
         # write that server ready for game. waiting for players
         self.qlabel_connectionReadyForGame.setText("Waiting for other players. Requset: " + role)
+
+    def gameWindow(self):
+        
+        self.setFixedSize(800,600)
+
+    def on_game_start(self, role):
+        self.gameWindow()
+        print("start game "+ role)
 
 def main():
     app = QApplication(sys.argv)

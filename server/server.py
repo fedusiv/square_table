@@ -11,7 +11,7 @@ import parser
 
 class GameManager:
 
-    PLAYERS_AMOUNT = 2  # Size of players in game
+    PLAYERS_AMOUNT = 1  # Size of players in game
     game_run = False # if False, it means game waits for players to connect and choose roles; becomes True when all players will choose role
     players = []
     def __init__(self):
@@ -85,12 +85,14 @@ class GameManager:
     def start_game(self):
         # choose roles for players
         roles = algorithms.choose_roles()
+        print("Set roles:")
         for i in range(self.PLAYERS_AMOUNT):
             self.players[i].role = roles[i]
+            print(self.players[i].role)
         # prepare messages for players
         self.thread_lock.acquire()
         for player in self.players:
-            player.send_start_game()
+            player.send_start_game()    
         self.thread_lock.release()
         self.game_run = True
 
@@ -146,7 +148,7 @@ def threaded(sock, GM: GameManager):
                 keep_alive_counter = 0  # message receive keep_alive counter set to 0
                 info = parser.parserInput(message, player.name)
                 parsing = parse_received_message(info)
-
+                
                 # exit message
                 if parsing.enum == parser.ParsingEnum.EXIT:
                     print(" Received exit from player : " + player.name)
@@ -162,6 +164,9 @@ def threaded(sock, GM: GameManager):
                                                 "player_name": player.name, 
                                                 "role": player.request_role}),'UTF-8'))
                     continue
+                # player send answer, that game is really start
+                if parsing.enum == parser.ParsingEnum.START_GAME:
+                    print("  start game for player: " + player.name)
 
             except socket.timeout:
                 # if does not recieve need to send keepalive message to check is client alive.
@@ -186,8 +191,9 @@ def threaded(sock, GM: GameManager):
         sock.close()
     
     # if was any unexpected exeption
-    except Exception:
-        print("Closing connection and del player if was exeption")
+    except Exception as e:
+        print(str(e))
+        print("Closing connection and del player cause was exeption")
         if player is not None:
             if player_accepted:
                 GM.delete_player(player.id)
@@ -198,7 +204,8 @@ def parse_received_message(info):
     type_switch = {
         CP.KEEPALIVE_TYPE: parser.parse_keepalive,
         CP.EXIT_TYPE: parser.parse_exit,
-        CP.CHOOSE_ROLE_REQUEST: parser.parse_choose_role
+        CP.CHOOSE_ROLE_REQUEST: parser.parse_choose_role,
+        CP.START_GAME: parser.parse_start_game
     }
 
     parse = type_switch.get(info.message["type"], parser.parse_error_parse)
