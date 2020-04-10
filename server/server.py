@@ -11,7 +11,7 @@ import parser
 
 class GameManager:
 
-    PLAYERS_AMOUNT = 1  # Size of players in game
+    PLAYERS_AMOUNT = 2  # Size of players in game
     game_run = False # if False, it means game waits for players to connect and choose roles; becomes True when all players will choose role
     players = []
     def __init__(self):
@@ -80,11 +80,18 @@ class GameManager:
                 players_list += p.name + " "
         print("players list : " + players_list)
         self.thread_lock.release()
-
+    
     # Funtion to START GAME
     def start_game(self):
         # choose roles for players
-        roles = algorithms.choose_roles()
+        choices = []
+        for player in  self.players:
+            choices.append(player.request_role)
+        # Only For Debug
+        if self.PLAYERS_AMOUNT < 5:
+            roles = algorithms.choose_roles_debug(len(self.players))
+        else:
+            roles = algorithms.choose_roles(choices)
         print("Set roles:")
         for i in range(self.PLAYERS_AMOUNT):
             self.players[i].role = roles[i]

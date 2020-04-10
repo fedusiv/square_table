@@ -311,6 +311,7 @@ class Gui(QWidget):
     # Handler choosing role buttons. And jsut send information to server.
     def on_clicked_choose_role(self, role):
         button = self.sender()
+        button.setEnabled(False)    # avoid second send of player's decision from mechanic case.
         role = None
         if button == self.qbutton_chooseGeneral :
             role = CP.GENERAL
