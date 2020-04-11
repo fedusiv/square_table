@@ -6,7 +6,7 @@ import json
 import queue
 import communication_protocol as CP
 from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QPushButton, QLineEdit, QMessageBox,
-                                QHBoxLayout, QVBoxLayout)
+                                QHBoxLayout, QVBoxLayout, QGroupBox)
 from PyQt5.QtCore import QObject, pyqtSignal
 
 #
@@ -62,7 +62,6 @@ class Client(QObject):
             delivery = self.get_message_from_queue_for_send()
             if delivery is not None:
                 self.sock.send(bytes(json.dumps(delivery), 'UTF-8')) # send message to server
-
             try:
                 reciving = self.sock.recv(1024).decode('UTF-8')
                 if reciving == "":
@@ -80,7 +79,8 @@ class Client(QObject):
                 # received keepalive
                 if received["type"] == CP.KEEPALIVE_TYPE:
                     if received["player_name"] == self.player_name:
-                        self.sock.send(bytes(json.dumps({"type": CP.KEEPALIVE_TYPE, "status": CP.STATUS_OK}),'UTF-8'))
+                        msg = {"type": CP.KEEPALIVE_TYPE, "status": CP.STATUS_OK}
+                        self.put_message_to_queue_for_send(msg)
                         self.signal_keepalive.emit(received)
                 # server sent approvment, that it received request for choosen role
                 if received["type"] == CP.CHOOSE_ROLE_REQUEST:
@@ -90,7 +90,8 @@ class Client(QObject):
                 if received["type"] == CP.START_GAME:
                     if received["player_name"] == self.player_name:
                         # received player role, so START GAME. Just to ping server, that player is ready
-                        self.sock.send(bytes(json.dumps({"type": CP.START_GAME, "status": CP.STATUS_OK}),'UTF-8'))
+                        msg = {"type": CP.START_GAME, "status": CP.STATUS_OK}
+                        self.put_message_to_queue_for_send(msg)
                         self.signal_start_game.emit(received["role"])
             except socket.timeout:
                 data.server_keepalive_counter+=1
@@ -213,19 +214,26 @@ class Gui(QWidget):
 
     # Status bar, which dosplays server connection status
     def connectionStatusBarInit(self):
+        self.qgroupbox_connectionStatusBar = QGroupBox(self)
+        self.qgroupbox_connectionStatusBar.setGeometry(10,0,680,40)
+        self.qgroupbox_connectionStatusBar.show()
+        
         self.qlabel_connectionStatus = QLabel()
         self.qlabel_connectionNickName = QLabel()
         self.qlabel_connectionServerTime = QLabel()
         self.qlabel_connectionReadyForGame = QLabel()
-        self.layoutStatusBar = QHBoxLayout()
-        self.layoutStatusBar.addWidget(self.qlabel_connectionStatus)
-        self.layoutStatusBar.addWidget(self.qlabel_connectionNickName)
-        self.layoutStatusBar.addWidget(self.qlabel_connectionServerTime)
-        self.layoutStatusBar.addWidget(self.qlabel_connectionReadyForGame)
-
+        
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0,0,0,0)
+        layout.addWidget(self.qlabel_connectionStatus)
+        layout.addWidget(self.qlabel_connectionNickName)
+        layout.addWidget(self.qlabel_connectionServerTime)
+        layout.addWidget(self.qlabel_connectionReadyForGame)
+        self.qgroupbox_connectionStatusBar.setLayout(layout)
+        
     def chooseRoleWindow(self):
         self.connectWindowClose()
-        self.setFixedSize(700,350)
+        self.setFixedSize(700,110)
 
         # Description layout
         label_generalDesc = QLabel(self)
@@ -239,12 +247,9 @@ class Gui(QWidget):
         label_manufacturerDesc = QLabel(self)
         label_manufacturerDesc.setText("Manufacturer\nDescription")
         
-        layoutDesc = QHBoxLayout()
-        layoutDesc.addWidget(label_generalDesc)
-        layoutDesc.addWidget(label_diplomatDesc)
-        layoutDesc.addWidget(label_bishopDesc)
-        layoutDesc.addWidget(label_manufacturerDesc)
-        layoutDesc.addWidget(label_treasurerDesc)
+        #self.qgroupbox_rolesDescription = QGroupBox(self)
+        #self.qgroupbox_rolesDescription.setGeometry(10,30,680,240)
+        #self.qgroupbox_rolesDescription.show()
 
         #Chose Role Buttons layout
         self.qbutton_chooseGeneral      = QPushButton(text="General")
@@ -258,26 +263,22 @@ class Gui(QWidget):
         self.qbutton_chooseManufacturer = QPushButton(text="Manufacturer")
         self.qbutton_chooseManufacturer.clicked.connect(self.on_clicked_choose_role)
         
+        self.qgroupbox_chooseRoleButtons = QGroupBox(self)
+        self.qgroupbox_chooseRoleButtons.setGeometry(10,30,680,60)
+        self.qgroupbox_chooseRoleButtons.show()
 
-        layoutButtons = QHBoxLayout()
-        layoutButtons.addWidget(self.qbutton_chooseGeneral     )
-        layoutButtons.addWidget(self.qbutton_chooseDiplomat    )
-        layoutButtons.addWidget(self.qbutton_chooseBishop      )
-        layoutButtons.addWidget(self.qbutton_chooseManufacturer)
-        layoutButtons.addWidget(self.qbutton_chooseTreasurer   )
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0,0,0,0)
+        layout.addWidget(self.qbutton_chooseGeneral)
+        layout.addWidget(self.qbutton_chooseDiplomat)
+        layout.addWidget(self.qbutton_chooseBishop)
+        layout.addWidget(self.qbutton_chooseManufacturer)
+        layout.addWidget(self.qbutton_chooseTreasurer)
+        self.qgroupbox_chooseRoleButtons.setLayout(layout)
 
         #Additional Buttons Layout
         self.qbutton_chooseRandomRole = QPushButton(text="Choose Random Role")
-        layoutAdButtons = QHBoxLayout()
-        layoutAdButtons.addWidget(self.qbutton_chooseRandomRole)
 
-        self.layoutChooseRole = QVBoxLayout(self)
-        self.layoutChooseRole.addLayout(self.layoutStatusBar)
-        self.layoutChooseRole.addLayout(layoutDesc)
-        self.layoutChooseRole.addLayout(layoutButtons)
-        self.layoutChooseRole.addLayout(layoutAdButtons)
-        
-        self.setLayout(self.layoutChooseRole)
 
     #Handler Signal from Button to connect to server
     def on_connect_to_server_clicked(self):
@@ -340,12 +341,12 @@ class Gui(QWidget):
         self.qlabel_connectionReadyForGame.setText("Waiting for other players. Requset: " + role)
 
     def gameWindow(self):
-        
-        self.setFixedSize(800,600)
+        self.setFixedSize(700,600)
 
     def on_game_start(self, role):
+        self.qgroupbox_chooseRoleButtons.hide() # hide choose role buttons
         self.gameWindow()
-        print("start game "+ role)
+        self.qlabel_connectionReadyForGame.setText("On-Game")
 
 def main():
     app = QApplication(sys.argv)
