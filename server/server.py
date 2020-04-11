@@ -151,29 +151,35 @@ def threaded(sock, GM: GameManager):
                 sock.send(bytes(json.dumps(delivery), 'UTF-8')) # send message to client
             # receive messages
             try:
-                message = json.loads(sock.recv(1024).decode('UTF-8'))
+                message_raw = sock.recv(1024).decode('UTF-8')
                 keep_alive_counter = 0  # message receive keep_alive counter set to 0
-                info = parser.parserInput(message, player.name)
-                parsing = parse_received_message(info)
-                
-                # exit message
-                if parsing.enum == parser.ParsingEnum.EXIT:
-                    print(" Received exit from player : " + player.name)
-                    break
-                # keep_alive message
-                if parsing.enum == parser.ParsingEnum.KEEP_ALIVE:
-                    # just to be in touch with client
-                    pass
-                # choose role request message
-                if parsing.enum == parser.ParsingEnum.CHOOSE_ROLE_REQUEST:
-                    GM.request_role(player.id, parsing.role)
-                    sock.send(bytes(json.dumps({"type": CP.CHOOSE_ROLE_REQUEST, 
-                                                "player_name": player.name, 
-                                                "role": player.request_role}),'UTF-8'))
-                    continue
-                # player send answer, that game is really start
-                if parsing.enum == parser.ParsingEnum.START_GAME:
-                    print("  start game for player: " + player.name)
+                messages = message_raw.split('}')
+                for msg in messages:
+                    if msg == "":
+                        continue
+                    msg+= '}'
+                    message = json.loads(msg)
+                    info = parser.parserInput(message, player.name)
+                    parsing = parse_received_message(info)
+
+                    # exit message
+                    if parsing.enum == parser.ParsingEnum.EXIT:
+                        print(" Received exit from player : " + player.name)
+                        break
+                    # keep_alive message
+                    if parsing.enum == parser.ParsingEnum.KEEP_ALIVE:
+                        # just to be in touch with client
+                        pass
+                    # choose role request message
+                    if parsing.enum == parser.ParsingEnum.CHOOSE_ROLE_REQUEST:
+                        GM.request_role(player.id, parsing.role)
+                        sock.send(bytes(json.dumps({"type": CP.CHOOSE_ROLE_REQUEST, 
+                                                    "player_name": player.name, 
+                                                    "role": player.request_role}),'UTF-8'))
+                        continue
+                    # player send answer, that game is really start
+                    if parsing.enum == parser.ParsingEnum.START_GAME:
+                        print("  start game for player: " + player.name)
 
             except socket.timeout:
                 # if does not recieve need to send keepalive message to check is client alive.
@@ -182,7 +188,8 @@ def threaded(sock, GM: GameManager):
                     # client does not respones
                     print("Client of player : " + player.name + " disconnected via keep alive")
                     break
-                servertime = time.asctime(time.localtime(time.time()))
+                servertime_t = time.localtime()
+                servertime = time.strftime("%H:%M:%S", servertime_t)
                 sock.send(bytes(json.dumps({"type": CP.KEEPALIVE_TYPE, "player_name": player.name, "server_time": servertime}),
                              'UTF-8'))
 
