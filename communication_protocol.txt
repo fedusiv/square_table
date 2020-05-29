@@ -23,3 +23,8 @@ start_game:
     server: {type, player_name, role} send
     client: {type, status}
     server sends to each player role, which was decided, and client starts game
+
+player_status:
+    server: {type, player_name, role, server_time, round_time, gold, king_points, people_points}
+    client : {type, status}
+    server send to players their's stats

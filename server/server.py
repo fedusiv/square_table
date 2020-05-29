@@ -14,6 +14,8 @@ class GameManager:
     PLAYERS_AMOUNT = 2  # Size of players in game
     game_run = False # if False, it means game waits for players to connect and choose roles; becomes True when all players will choose role
     players = []
+    time_game_start_point = 0 # Time point when game has started
+
     def __init__(self):
         self.thread_lock = threading.Lock()
 
@@ -99,7 +101,8 @@ class GameManager:
         # prepare messages for players
         self.thread_lock.acquire()
         for player in self.players:
-            player.send_start_game()    
+            player.send_start_game()
+        self.time_game_start_point = time.time()    # get time of game start
         self.thread_lock.release()
         self.game_run = True
 
