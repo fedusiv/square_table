@@ -93,6 +93,10 @@ class Client(QObject):
                         msg = {"type": CP.START_GAME, "status": CP.STATUS_OK}
                         self.put_message_to_queue_for_send(msg)
                         self.signal_start_game.emit(received["role"])
+                # server sent signal that round is began and here is information for current round
+                if received["type"] == CP.ROUND_BEGIN:
+                   msg = {"type": CP.ROUND_BEGIN, "status": CP.STATUS_OK}
+                   self.put_message_to_queue_for_send(msg)
             except socket.timeout:
                 data.server_keepalive_counter+=1
                 if data.server_keepalive_counter > data.server_keepalive_count :

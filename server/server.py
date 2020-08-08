@@ -8,14 +8,17 @@ import algorithms
 import communication_protocol as CP
 from player import Player
 import parser
+from game_process import GameProcess
+
 
 class GameManager:
 
-    PLAYERS_AMOUNT = 2  # Size of players in game
+    PLAYERS_AMOUNT = 1  # Amount of players in game
     game_run = False # if False, it means game waits for players to connect and choose roles; becomes True when all players will choose role
     players = []
     time_game_start_point = 0 # Time point when game has started
-
+    game_process = None
+ 
     def __init__(self):
         self.thread_lock = threading.Lock()
 
@@ -45,7 +48,11 @@ class GameManager:
             # Main loop for game
             # If game is not running. Game is waiting for players
             if self.game_run :
-                pass
+                if self.game_process.isRoundBegin is False :
+                   self.game_process.isRoundBegin = True
+                   for player in self.players:
+                       player.send_start_round("First round")
+                  
             else:
                 # Check request
                 player_ready_count = 0
@@ -103,6 +110,7 @@ class GameManager:
         for player in self.players:
             player.send_start_game()
         self.time_game_start_point = time.time()    # get time of game start
+        self.game_process = GameProcess()
         self.thread_lock.release()
         self.game_run = True
 

@@ -28,3 +28,9 @@ player_status:
     server: {type, player_name, role, server_time, round_time, gold, king_points, people_points}
     client : {type, status}
     server send to players their's stats
+
+round_started:
+    server : {type, description}
+    client : {type, status}
+    server sends to players currect round description
+
