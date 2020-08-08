@@ -2,16 +2,12 @@ import queue
 import communication_protocol as CP
 
 class PlayerStats:
-    gold = None
-    king_points = None
-    people_points = None
+    points_value = None
 
     def __init__(self):
         # set default points
-        self.gold = 10
-        self.king_points = 0
-        self.people_points = 0
-
+	self.points_value = 0
+	 
 class Player:
 
     name = None

@@ -239,13 +239,11 @@ class Gui(QWidget):
         label_generalDesc = QLabel(self)
         label_generalDesc.setText("General\nDescription")
         label_diplomatDesc = QLabel(self)
-        label_diplomatDesc.setText("Diplomat\nDescription")
+        label_diplomatDesc.setText("Deputy\nDescription")
         label_bishopDesc = QLabel(self)
         label_bishopDesc.setText("Bishop\nDescription")
         label_treasurerDesc = QLabel(self)
         label_treasurerDesc.setText("Treasurer\nDescription")
-        label_manufacturerDesc = QLabel(self)
-        label_manufacturerDesc.setText("Manufacturer\nDescription")
         
         #self.qgroupbox_rolesDescription = QGroupBox(self)
         #self.qgroupbox_rolesDescription.setGeometry(10,30,680,240)
@@ -254,14 +252,12 @@ class Gui(QWidget):
         #Chose Role Buttons layout
         self.qbutton_chooseGeneral      = QPushButton(text="General")
         self.qbutton_chooseGeneral.clicked.connect(self.on_clicked_choose_role)
-        self.qbutton_chooseDiplomat     = QPushButton(text="Diplomat")
-        self.qbutton_chooseDiplomat.clicked.connect(self.on_clicked_choose_role)
+        self.qbutton_chooseDeputy     = QPushButton(text="Deputy")
+        self.qbutton_chooseDeputy.clicked.connect(self.on_clicked_choose_role)
         self.qbutton_chooseBishop       = QPushButton(text="Bishop")
         self.qbutton_chooseBishop.clicked.connect(self.on_clicked_choose_role)
         self.qbutton_chooseTreasurer    = QPushButton(text="Treasure")
         self.qbutton_chooseTreasurer.clicked.connect(self.on_clicked_choose_role)
-        self.qbutton_chooseManufacturer = QPushButton(text="Manufacturer")
-        self.qbutton_chooseManufacturer.clicked.connect(self.on_clicked_choose_role)
         
         self.qgroupbox_chooseRoleButtons = QGroupBox(self)
         self.qgroupbox_chooseRoleButtons.setGeometry(10,30,680,60)
@@ -270,9 +266,8 @@ class Gui(QWidget):
         layout = QHBoxLayout()
         layout.setContentsMargins(0,0,0,0)
         layout.addWidget(self.qbutton_chooseGeneral)
-        layout.addWidget(self.qbutton_chooseDiplomat)
+        layout.addWidget(self.qbutton_chooseDeputy)
         layout.addWidget(self.qbutton_chooseBishop)
-        layout.addWidget(self.qbutton_chooseManufacturer)
         layout.addWidget(self.qbutton_chooseTreasurer)
         self.qgroupbox_chooseRoleButtons.setLayout(layout)
 
@@ -316,14 +311,12 @@ class Gui(QWidget):
         role = None
         if button == self.qbutton_chooseGeneral :
             role = CP.GENERAL
-        elif button == self.qbutton_chooseDiplomat :
-            role = CP.DIPLOMAT
-        elif button == self.qbutton_chooseManufacturer:
-            role = CP.MANUFACTURER
-        elif button == self.qbutton_chooseBishop:
-            role = CP.BISHOP
+        elif button == self.qbutton_chooseDeputy :
+            role = CP.DEPUTY
         elif button == self.qbutton_chooseTreasurer:
             role = CP.TREASURER
+        elif button == self.qbutton_chooseBishop:
+            role = CP.BISHOP
         elif button == self.qbutton_chooseRandomRole:
             role = CP.ROLE_RANDOM
         # say client to send player decision
@@ -332,9 +325,8 @@ class Gui(QWidget):
     def on_choose_role_request_approved(self, role):
         # disable buttons for choose role
         self.qbutton_chooseGeneral.setEnabled(False)
-        self.qbutton_chooseDiplomat.setEnabled(False)
+        self.qbutton_chooseDeputy.setEnabled(False)
         self.qbutton_chooseBishop.setEnabled(False)
-        self.qbutton_chooseManufacturer.setEnabled(False)
         self.qbutton_chooseTreasurer.setEnabled(False)
         self.qbutton_chooseRandomRole.setEnabled(False)
         # write that server ready for game. waiting for players

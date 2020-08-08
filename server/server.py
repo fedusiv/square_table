@@ -90,7 +90,7 @@ class GameManager:
         for player in  self.players:
             choices.append(player.request_role)
         # Only For Debug
-        if self.PLAYERS_AMOUNT < 5:
+        if self.PLAYERS_AMOUNT < 4:
             roles = algorithms.choose_roles_debug(len(self.players))
         else:
             roles = algorithms.choose_roles(choices)
